@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>parkcit</title>
+        <style>
+            [v-cloak] {
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="app" v-cloak>
+            <!-- USER TYPES -->
+            <div class="vehicles">
+                <h2>User Types <span><a href="javascript:;" @click="user_types.is_adding = !user_types.is_adding">Add</a></span></h2>
+                <div v-if="user_types.is_adding">
+                    <form @submit.prevent="addUserType">
+                        <input placeholder="User type" v-model="user_type_form.userType" />
+                        <button>Submit</button>
+                    </form>
+                </div>
+                <ol>
+                    <li v-for="user_type in user_types.data">
+                        {{user_type}}
+                    </li>
+                </ol>
+            </div>
+            <!-- users -->
+            <div class="users">
+                <h2>Users <span><a href="javascript:;" @click="users.is_adding = !users.is_adding">Add</a></span></h2>
+                <div v-if="users.is_adding">
+                    <form @submit.prevent="addUser">
+                        <select v-model="user_form.userType">
+                            <option v-for="(user_type, i) in user_types.data" :key="i" :value="user_type">{{user_type.userType}}</option>
+                        </select>
+                        <input placeholder="First name" v-model="user_form.userFName" />
+                        <input placeholder="Last name" v-model="user_form.userLName" />
+                        <input v-model="user_form.hasMiddleName" hidden />
+                        <input v-model="user_form.userBirthDate" type="date" />
+                        <button>Submit</button>
+                    </form>
+                </div>
+                <div v-if="users.add_vehicle_for > 0">
+                    <form @submit.prevent="addUserVehicle">
+                        <form @submit.prevent="addVehicle">
+                            <input disabled="disabled" :value="users.add_vehicle_for" />
+                            <input placeholder="Vehicle type" v-model="vehicle_form.vehicleType" />
+                            <input placeholder="Vehicle plate number" v-model="vehicle_form.vehiclePlateNo" />
+                            <input placeholder="Vehicle name" v-model="vehicle_form.vehicleName" />
+                            <input placeholder="Vehicle color" v-model="vehicle_form.vehicleColor" />
+                            <button type="button" @click="users.add_vehicle_for = 0">Cancel</button>
+                            <button>Submit</button>
+                        </form>
+                    </form>
+                </div>
+                <ol>
+                    <li v-for="user in users.data">
+                        <span><a href="javascript:;" @click="users.add_vehicle_for = user.userID">Add vehicle</a></span> {{user}}
+                    </li>
+                </ol>
+            </div>
+            <!-- PARKING LOTS -->
+            <div class="parking-lots">
+                <h2>Parking Lots <span><a href="javascript:;" @click="parking_lots.is_adding = !parking_lots.is_adding">Add</a></span></h2>
+                <div v-if="parking_lots.is_adding">
+                    <form @submit.prevent="addParkingLot">
+                        <input placeholder="Lot name" v-model="parking_lot_form.parkingLotName" />
+                        <input placeholder="Slots total" type="number" v-model="parking_lot_form.parkingSlotTotal" />
+                        <input placeholder="Slots avalable" v-model="parking_lot_form.parkingSlotAvailable" type="number" />
+                        <button>Submit</button>
+                    </form>
+                </div>
+                <ol>
+                    <li v-for="parking_lot in parking_lots.data">
+                        <a href="javascript:;" @click="fetchAvailableSlots(parking_lot.parkingLotID)">Check available slots</a> {{parking_lot}}
+                    </li>
+                </ol>
+                <!-- AVAILABLE PARKING SLOTS -->
+                <div v-if="available_parking_slots.data.length > 0" class="available-parking-slots" style="margin-left: 40px;">
+                    <h3>Available Parking Slots ({{available_parking_slots.data.length}})</h3>
+                    <ol>
+                        <li v-for="available_parking_slot in available_parking_slots.data">
+                            {{available_parking_slot}}
+                        </li>
+                    </ol>
+                </div>
+            </div>
+            <!-- VEHICLES -->
+            <div class="vehicles">
+                <h2>Vehicles <span><a href="javascript:;" @click="vehicles.is_adding = !vehicles.is_adding">Add</a></span></h2>
+                <div v-if="vehicles.is_adding">
+                    <form @submit.prevent="addVehicle">
+                        <input placeholder="Vehicle type" v-model="vehicle_form.vehicleType" />
+                        <input placeholder="Vehicle plate number" v-model="vehicle_form.vehiclePlateNo" />
+                        <input placeholder="Vehicle name" v-model="vehicle_form.vehicleName" />
+                        <input placeholder="Vehicle color" v-model="vehicle_form.vehicleColor" />
+                        <button>Submit</button>
+                    </form>
+                </div>
+                <ol>
+                    <li v-for="vehicle in vehicles.data">
+                        {{vehicle}}
+                    </li>
+                </ol>
+            </div>
+            <!-- PARKING SLOTS -->
+            <div class="parking-slots">
+                <h2>Parking Slots <span><a href="javascript:;" @click="parking_slots.is_adding = !parking_slots.is_adding">Add</a></span></h2>
+                <div v-if="parking_slots.is_adding">
+                    <form @submit.prevent="addParkingSlot">
+                        <select v-model="parking_slot_form.parkingLot">
+                            <option v-for="(parking_lot, i) in parking_lots.data" :key="i" :value="parking_lot">{{ parking_lot.parkingLotName }}</option>
+                        </select>
+                        Employee <input v-model="parking_slot_form.isEmployee" type="checkbox" />
+                        Available <input v-model="parking_slot_form.isAvailable" type="checkbox" />
+                        <button>Submit</button>
+                    </form>
+                </div>
+                <ol>
+                    <li v-for="parking_slot in parking_slots.data">
+                        {{parking_slot}}
+                    </li>
+                </ol>
+            </div>
+            
+        </div>
+
+        <script type="module">
+            import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
+
+            createApp({
+                data() {
+                    return {
+                        host                : 'http://localhost:8080',
+                        message             : 'Hello Vue!',
+                        // fetched data
+                        users               : {
+                            data      : [],
+                            is_adding : false,
+                            add_vehicle_for : 0,
+                        },
+                        parking_lots: {
+                            data      : [],
+                            is_adding : false,
+                        },
+                        vehicles: {
+                            data      : [],
+                            is_adding : false,
+                        },
+                        user_types: {
+                            data      : [],
+                            is_adding : false,
+                        },
+                        parking_slots: {
+                            data      : [],
+                            is_adding : false,
+                        },
+                        available_parking_slots: {
+                            data      : [],
+                        },
+                        // forms
+                        user_form   : {
+                            userType        : {},
+                            userFName       : '',
+                            userLName       : '',
+                            hasMiddleName   : '',
+                            userBirthDate   : '',
+                        },
+                        parking_lot_form : {
+                            parkingLotName          : '',
+                            parkingSlotTotal        : 0,
+                            parkingSlotAvailable    : 0,
+                        },
+                        vehicle_form : {
+                            vehicleType             : '',
+                            vehiclePlateNo          : '',
+                            vehicleName             : '',
+                            vehicleColor            : '',
+                        },
+                        user_type_form : {
+                            userType                : '',
+                        },
+                        parking_slot_form : {
+                            parkingLot              : {},
+                            isEmployee              : '',
+                            isAvailable             : '',
+                        },
+                    }
+                },
+                methods: {
+                    fetchParkingLots () {
+                        fetch(this.host+'/parkinglots')
+                        .then(response => response.json())
+                            .then(data => {
+                                this.parking_lots.data = data;
+                            })
+                        .catch(error => console.error('Error fetching data:', error));
+                    },
+                    fetchUsers () {
+                        fetch(this.host+'/users')
+                        .then(response => response.json())
+                            .then(data => {
+                                this.users.data = data;
+                            })
+                        .catch(error => console.error('Error fetching data:', error));
+                    },
+                    fetchVehicles () {
+                        fetch(this.host+'/vehicles')
+                        .then(response => response.json())
+                            .then(data => {
+                                this.vehicles.data = data;
+                            })
+                        .catch(error => console.error('Error fetching data:', error));
+                    },
+                    fetchUserTypes () {
+                        fetch(this.host+'/user-types')
+                        .then(response => response.json())
+                            .then(data => {
+                                this.user_types.data = data;
+                            })
+                        .catch(error => console.error('Error fetching data:', error));
+                    },
+                    fetchParkingSlots () {
+                        fetch(this.host+'/parking-slots')
+                        .then(response => response.json())
+                            .then(data => {
+                                this.parking_slots.data = data;
+                            })
+                        .catch(error => console.error('Error fetching data:', error));
+                    },
+                    fetchAvailableSlots (parking_lot_id) {
+                        fetch(`${this.host}/parkinglots/available-slots/${parking_lot_id}`)
+                        .then(response => response.json())
+                            .then(data => {
+                                this.available_parking_slots.data = data;
+                            })
+                        .catch(error => console.error('Error fetching data:', error));
+                    },
+                    addUser () {
+                        fetch(this.host+'/users', {
+                            method: 'POST',
+                            headers: {
+                            'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.user_form),
+                        })
+                        .then(response => {
+                            if(response.ok)
+                                this.fetchUsers()
+                        })
+                    },
+                    addParkingLot () {
+                        fetch(this.host+'/parkinglots', {
+                            method: 'POST',
+                            headers: {
+                            'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.parking_lot_form),
+                        }) 
+                        .then(response => {
+                            if(response.ok)
+                                this.fetchParkingLots()
+                        })         
+                    },
+                    addVehicle () {
+                        fetch(this.host+'/vehicles', {
+                            method: 'POST',
+                            headers: {
+                            'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.vehicle_form),
+                        })
+                        .then(response => {
+                            if(response.ok)
+                                this.fetchVehicles()
+                        })  
+                    },
+                    addUserType () {
+                        fetch(this.host+'/user-types', {
+                            method: 'POST',
+                            headers: {
+                            'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.user_type_form),
+                        })
+                        .then(response => {
+                            if(response.ok)
+                                this.fetchUserTypes()
+                        })       
+                    },
+                    addParkingSlot () {
+                        fetch(this.host+'/parking-slots', {
+                            method: 'POST',
+                            headers: {
+                            'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.parking_slot_form),
+                        })
+                        .then(response => {
+                            if(response.ok)
+                                this.fetchParkingSlots()
+                        })      
+                    },
+                    addUserVehicle () {
+                        const user_vehicle_form = this.vehicle_form
+                        fetch(`${this.host}/users/${this.users.add_vehicle_for}/add-vehicle`, {
+                            method: 'POST',
+                            headers: {
+                            'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.vehicle_form),
+                        })
+                        .then(response => {
+                            if(response.ok){
+                                this.fetchUsers()
+                                this.fetchVehicles()
+                            }
+                        })
+                    },
+                },
+                created() {
+                    this.fetchUsers()
+                    this.fetchParkingLots()
+                    this.fetchVehicles()
+                    this.fetchUserTypes()
+                    this.fetchParkingSlots()
+                },
+            }).mount('#app')
+        </script>
+
+        
+    </body>
+</html>
